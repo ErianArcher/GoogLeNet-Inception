@@ -65,6 +65,7 @@ class CIFAR(DataFlow):
         else:
             self._file_list = [os.path.join(data_dir, 'test_batch')]
 
+        self._file_buffer_list = []
         self.shuffle = shuffle
 
         self.setup(epoch_val=0, batch_size=1)
@@ -78,9 +79,19 @@ class CIFAR(DataFlow):
         self._image_id = 0
         self._batch_file_id = -1
         self._image = []
+        self._load_all_file()
         self._next_batch_file()
 
         print('Data Loaded! Size of data: {}'.format(self.size()))
+
+    # Load all data to buffer
+    def _load_all_file(self):
+        for fn in self._file_list:
+            data_dict = unpickle(fn)
+            self._file_buffer_list.append(data_dict)
+
+    def _get_batch_file_from_buffer_by_id(self, id):
+        return self._file_buffer_list[id]
 
     def _next_batch_file(self):
         if self._batch_file_id >= len(self._file_list) - 1:
@@ -88,11 +99,11 @@ class CIFAR(DataFlow):
             self._epochs_completed += 1
         else:
             self._batch_file_id += 1
-        data_dict = unpickle(self._file_list[self._batch_file_id])
+        data_dict = self._get_batch_file_from_buffer_by_id(self._batch_file_id)  # Altered by ErianLiang
         self._image = np.array(data_dict['image'])
         if self._pf:
             self._image = [self._pf(im) for im in self._image]
-            self._image = np.array(self._image )
+            self._image = np.array(self._image)
         self._label = np.array(data_dict['label'])
 
         if self.shuffle:
@@ -134,7 +145,7 @@ class CIFAR(DataFlow):
 
         mean_list = []
         for c_id in range(0, im_list.shape[-1]):
-            mean_list.append(np.mean(im_list[:,:,:,c_id]))
+            mean_list.append(np.mean(im_list[:, :, :, c_id]))
         return mean_list
 
     def size(self):
@@ -147,11 +158,11 @@ class CIFAR(DataFlow):
                 data_size += len(tmp_image)
             self.data_size = data_size
             return self.data_size
-        
+
     def next_batch(self):
         assert self._batch_size <= self.size(), \
-          "batch_size {} cannot be larger than data size {}".\
-           format(self._batch_size, self.size())
+            "batch_size {} cannot be larger than data size {}". \
+                format(self._batch_size, self.size())
 
         start = self._image_id
         self._image_id += self._batch_size
@@ -187,11 +198,10 @@ def unpickle(file):
     image = dict[b'data']
     labels = dict[b'labels']
 
-    r = image[:,:32*32].reshape(-1,32,32)
-    g = image[:,32*32: 2*32*32].reshape(-1,32,32)
-    b = image[:,2*32*32:].reshape(-1,32,32)
+    r = image[:, :32 * 32].reshape(-1, 32, 32)
+    g = image[:, 32 * 32: 2 * 32 * 32].reshape(-1, 32, 32)
+    b = image[:, 2 * 32 * 32:].reshape(-1, 32, 32)
 
-    image = np.stack((r,g,b),axis=-1)
+    image = np.stack((r, g, b), axis=-1)
 
     return {'image': image.astype(float), 'label': labels}
-
